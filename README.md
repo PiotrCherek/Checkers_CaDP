@@ -1,1 +1,1 @@
-# Checkers_CaDP
+# Checkers for Concurrent & Distributed Processing Project

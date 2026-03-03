@@ -21,16 +21,41 @@ class Checkers:
 
         return board
 
-    def move_piece(self, from_row: int, from_col: int, to_row: int, to_col: int) -> None:
+    def own_piece_selected(self, row: int, col: int) -> bool:
+        return self.board[row][col] is not None and self.board[row][col] == self.current_player
+
+    def move_legal(self, row: int, col: int) -> bool:
+        from_row, from_col = self.selected_piece
         piece = self.board[from_row][from_col]
+
         if piece is None:
-            raise ValueError("No piece at the source position")
-        if self.board[to_row][to_col] is not None:
-            raise ValueError("Destination position is not empty")
-        self.board[to_row][to_col] = piece
+            return False
+
+        if self.board[row][col] is not None:
+            return False
+
+        row_diff = row - from_row
+        col_diff = col - from_col
+
+        if piece == "White":
+            return row_diff == -1 and abs(col_diff) == 1
+        else:  # Black
+            return row_diff == 1 and abs(col_diff) == 1
+
+    def move_piece(self, row: int, col: int) -> None:
+        from_row, from_col = self.selected_piece
         self.board[from_row][from_col] = None
+        self.board[row][col] = self.current_player
+        self.selected_piece = None
 
     def handle_click(self, row: int, col: int) -> None:
+        if self.own_piece_selected(row, col):
+            self.selected_piece = (row, col)
+            return
+
         if self.selected_piece is None:
-            if self.board[row][col] is not None and self.board[row][col] == self.current_player:
-                self.selected_piece = (row, col)
+            return
+
+        if self.move_legal(row, col):
+            self.move_piece(row, col)
+            self.current_player = "Black" if self.current_player == "White" else "White"

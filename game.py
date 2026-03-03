@@ -35,7 +35,7 @@ class Game:
         self.draw_pieces()
 
         if selected_piece:
-            self.draw_possible_moves(self.screen, selected_piece)
+            self.draw_possible_moves(selected_piece)
 
     def run(self) -> None:
         while self.running:

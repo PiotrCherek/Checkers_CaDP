@@ -24,6 +24,9 @@ class Checkers:
     def own_piece_selected(self, row: int, col: int) -> bool:
         return self.board[row][col] is not None and self.board[row][col] == self.current_player
 
+    def square_exists(self, row: int, col: int) -> bool:
+        return 0 <= row < 8 and 0 <= col < 8
+
     def move_legal(self, row: int, col: int) -> bool:
         from_row, from_col = self.selected_piece
         piece = self.board[from_row][from_col]

@@ -26,8 +26,29 @@ class Game:
                     piece_color = (255, 255, 255) if piece == "White" else (0, 0, 0)
                     pygame.draw.circle(self.screen, piece_color, (col * 100 + 50, row * 100 + 50), 40)
 
+    def show_selected_piece(self, selected_piece: tuple) -> None:
+        if not selected_piece:
+            return
+
+        highlight_color = (255, 0, 255) if self.checkers.current_player == "White" else (255, 255, 0)
+
+        row, col = selected_piece
+        pygame.draw.circle(self.screen, highlight_color, (col * 100 + 50, row * 100 + 50), 45, 5)
+
     def draw_possible_moves(self, selected_piece: tuple) -> None:
-        pass
+        current_row, current_col = selected_piece
+        piece = self.checkers.board[current_row][current_col]
+
+        if piece is None:
+            return
+
+        directions = [(-1, -1), (-1, 1)] if piece == "White" else [(1, 1), (1, -1)]
+        highlight_color = (255, 0, 255) if self.checkers.current_player == "White" else (255, 255, 0)
+
+        for dr, dc in directions:
+            to_row, to_col = current_row + dr, current_col + dc
+            if self.checkers.square_exists(to_row, to_col) and self.checkers.move_legal(to_row, to_col):
+                pygame.draw.circle(self.screen, highlight_color, (to_col * 100 + 50, to_row * 100 + 50), 10)
 
     def show_board(self, selected_piece: tuple) -> None:
         self.screen.fill((0, 0, 0))
@@ -35,6 +56,7 @@ class Game:
         self.draw_pieces()
 
         if selected_piece:
+            self.show_selected_piece(selected_piece)
             self.draw_possible_moves(selected_piece)
 
     def run(self) -> None:

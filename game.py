@@ -1,16 +1,22 @@
 import pygame
 import checkers as ck
+from network import Network
 
 class Game:
     def __init__(self) -> None:
         pygame.init()
-
         self.screen = pygame.display.set_mode((800, 800))
-        pygame.display.set_caption("Checkers")
         self.clock = pygame.time.Clock()
         self.running = True
 
         self.checkers = ck.Checkers()
+        
+        self.network = Network()
+        self.my_color = self.network.color
+        pygame.display.set_caption(f"Warcaby - Jesteś graczem: {self.my_color}")
+        
+        self.last_network_sync = 0
+        self.sync_interval = 100 
 
     def draw_board(self) -> None:
         for row in range(8):
@@ -23,23 +29,20 @@ class Game:
             for col in range(8):
                 piece = self.checkers.board[row][col]
                 if piece is not None:
-                    # Determine base color
                     piece_color = (255, 255, 255) if "White" in piece else (20, 20, 20)
                     center = (col * 100 + 50, row * 100 + 50)
                     
-                    # Draw main piece
                     pygame.draw.circle(self.screen, piece_color, center, 40)
                     
                     if "King" in piece:
-                        pygame.draw.circle(self.screen, (255, 215, 0), center, 40, 5) # Gold border
-                        pygame.draw.circle(self.screen, (255, 215, 0), center, 15)    # Gold center
+                        pygame.draw.circle(self.screen, (255, 215, 0), center, 40, 5)
+                        pygame.draw.circle(self.screen, (255, 215, 0), center, 15)
 
     def show_selected_piece(self, selected_piece: tuple) -> None:
         if not selected_piece:
             return
 
         highlight_color = (255, 0, 255) if self.checkers.current_player == "White" else (255, 255, 0)
-
         row, col = selected_piece
         pygame.draw.circle(self.screen, highlight_color, (col * 100 + 50, row * 100 + 50), 45, 5)
 
@@ -62,11 +65,11 @@ class Game:
                     target = self.checkers.board[tr][tc]
                     if target is not None:
                         if self.checkers.current_player in target:
-                            break
+                            break 
                         else:
                             enemy_count += 1
                             if enemy_count > 1:
-                                break
+                                break 
 
                     if self.checkers.move_legal(tr, tc):
                         if mandatory:
@@ -74,6 +77,7 @@ class Game:
                                 continue 
                         pygame.draw.circle(self.screen, (0, 255, 0), (tc * 100 + 50, tr * 100 + 50), 15)
             return 
+
         if mandatory:
             directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
         else:
@@ -83,19 +87,6 @@ class Game:
             to_row, to_col = current_row + dr, current_col + dc
             if self.checkers.square_exists(to_row, to_col) and self.checkers.move_legal(to_row, to_col):
                 pygame.draw.circle(self.screen, (0, 255, 0), (to_col * 100 + 50, to_row * 100 + 50), 15)
-    def show_board(self, selected_piece: tuple) -> None:
-        self.screen.fill((0, 0, 0))
-        self.draw_board()
-        
-        mandatory = self.checkers.get_all_mandatory_jumps()
-        for r, c in mandatory:
-            pygame.draw.rect(self.screen, (255, 255, 0), (c * 100, r * 100, 100, 100), 5)
-
-        self.draw_pieces()
-
-        if selected_piece:
-            self.show_selected_piece(selected_piece)
-            self.draw_possible_moves(selected_piece)
 
     def is_path_capture(self, start_row, start_col, end_row, end_col) -> bool:
         step_r = 1 if end_row > start_row else -1
@@ -111,18 +102,61 @@ class Game:
             curr_c += step_c
         return False
 
+    def show_board(self, selected_piece: tuple) -> None:
+        self.screen.fill((0, 0, 0))
+        self.draw_board()
+        
+        mandatory = self.checkers.get_all_mandatory_jumps()
+        for r, c in mandatory:
+            pygame.draw.rect(self.screen, (255, 255, 0), (c * 100, r * 100, 100, 100), 5)
+
+        self.draw_pieces()
+
+        if selected_piece:
+            self.show_selected_piece(selected_piece)
+            self.draw_possible_moves(selected_piece)
+
     def run(self) -> None:
         while self.running:
+            current_time = pygame.time.get_ticks()
+            
+            if current_time - self.last_network_sync > self.sync_interval:
+                self.last_network_sync = current_time
+                try:
+                    server_state = self.network.send({"type": "GET"})
+                    
+                    if server_state and server_state.get("board") is not None:
+                        self.checkers.board = server_state["board"]
+                        self.checkers.current_player = server_state["current_player"]
+                except Exception as e:
+                    pass
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                    
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    x, y = event.pos
-                    col, row = x // 100, y // 100
-                    self.checkers.handle_click(row, col)
+                    if self.checkers.current_player == self.my_color:
+                        x, y = event.pos
+                        col, row = x // 100, y // 100
+                        
+                        old_player = self.checkers.current_player
+                        
+                        self.checkers.handle_click(row, col)
+                        
+                        if self.checkers.current_player != old_player:
+                            self.network.send({
+                                "type": "UPDATE",
+                                "board": self.checkers.board,
+                                "current_player": self.checkers.current_player
+                            })
 
             self.show_board(self.checkers.selected_piece)
             pygame.display.flip()
-            self.clock.tick(60) 
+            self.clock.tick(60)
 
         pygame.quit()
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()

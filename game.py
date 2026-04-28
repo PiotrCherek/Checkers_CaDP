@@ -13,10 +13,10 @@ class Game:
         
         self.network = Network()
         self.my_color = self.network.color
-        pygame.display.set_caption(f"Warcaby - Jesteś graczem: {self.my_color}")
+        pygame.display.set_caption(f"Checkers - your color: {self.my_color}")
         
         self.last_network_sync = 0
-        self.sync_interval = 100 
+        self.sync_interval = 5000 
 
     def draw_board(self) -> None:
         for row in range(8):

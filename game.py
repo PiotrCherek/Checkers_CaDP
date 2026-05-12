@@ -1,5 +1,7 @@
 import pygame
 import sys
+import time
+import threading
 import checkers as ck
 from network import Network
 
@@ -11,13 +13,13 @@ class Game:
         self.running = True
 
         self.checkers = ck.Checkers()
-        
         self.network = Network()
         self.my_color = self.network.color
         pygame.display.set_caption(f"Checkers - your color: {self.my_color}")
         
-        self.last_network_sync = 0
-        self.sync_interval = 500 
+        self.sync_interval = 500
+        self.network_thread = threading.Thread(target=self.sync_with_server_loop, daemon=True)
+        self.network_thread.start()
 
     def draw_board(self) -> None:
         for row in range(8):
@@ -167,21 +169,20 @@ class Game:
             
             pygame.display.flip()
 
+    def sync_with_server_loop(self) -> None:
+        while self.running:
+            try:
+                server_state = self.network.send({"type": "GET"})
+                if server_state and server_state.get("board") is not None:
+                    self.checkers.board = server_state["board"]
+                    self.checkers.current_player = server_state["current_player"]
+            except Exception:
+                pass
+
+            time.sleep(self.sync_interval / 1000.0)
+
     def run(self) -> None:
         while self.running:
-            current_time = pygame.time.get_ticks()
-            
-            if current_time - self.last_network_sync > self.sync_interval:
-                self.last_network_sync = current_time
-                try:
-                    server_state = self.network.send({"type": "GET"})
-                    
-                    if server_state and server_state.get("board") is not None:
-                        self.checkers.board = server_state["board"]
-                        self.checkers.current_player = server_state["current_player"]
-                except Exception as e:
-                    pass
-
             # Check if someone won the game
             winner = self.checkers.check_for_winner()
             if winner:

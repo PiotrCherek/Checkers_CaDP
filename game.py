@@ -1,4 +1,5 @@
 import pygame
+import sys
 import checkers as ck
 from network import Network
 
@@ -16,7 +17,7 @@ class Game:
         pygame.display.set_caption(f"Checkers - your color: {self.my_color}")
         
         self.last_network_sync = 0
-        self.sync_interval = 5000 
+        self.sync_interval = 500 
 
     def draw_board(self) -> None:
         for row in range(8):
@@ -116,6 +117,56 @@ class Game:
             self.show_selected_piece(selected_piece)
             self.draw_possible_moves(selected_piece)
 
+    def show_game_over_screen(self, winner_name: str) -> None:
+        font_large = pygame.font.SysFont(None, 72)
+        font_button = pygame.font.SysFont(None, 48)
+        
+        BACKGROUND_COLOR = (30, 30, 30)
+        TEXT_COLOR = (255, 255, 255)
+        BUTTON_COLOR = (200, 50, 50)
+        BUTTON_HOVER = (255, 70, 70)
+        
+        screen_width = self.screen.get_width()
+        screen_height = self.screen.get_height()
+        
+        button_width = 200
+        button_height = 60
+        button_x = (screen_width - button_width) // 2
+        button_y = (screen_height // 2) + 50
+        exit_button = pygame.Rect(button_x, button_y, button_width, button_height)
+        
+        waiting_for_input = True
+        while waiting_for_input:
+            mouse_pos = pygame.mouse.get_pos()
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                    
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1: 
+                        if exit_button.collidepoint(mouse_pos):
+                            pygame.quit()
+                            sys.exit() 
+
+            self.screen.fill(BACKGROUND_COLOR)
+            
+            win_text = font_large.render(f"{winner_name} WON!", True, TEXT_COLOR)
+            win_rect = win_text.get_rect(center=(screen_width // 2, screen_height // 2 - 50))
+            self.screen.blit(win_text, win_rect)
+            
+            if exit_button.collidepoint(mouse_pos):
+                pygame.draw.rect(self.screen, BUTTON_HOVER, exit_button, border_radius=10)
+            else:
+                pygame.draw.rect(self.screen, BUTTON_COLOR, exit_button, border_radius=10)
+                
+            btn_text = font_button.render("EXIT", True, TEXT_COLOR)
+            btn_rect = btn_text.get_rect(center=exit_button.center)
+            self.screen.blit(btn_text, btn_rect)
+            
+            pygame.display.flip()
+
     def run(self) -> None:
         while self.running:
             current_time = pygame.time.get_ticks()
@@ -131,6 +182,11 @@ class Game:
                 except Exception as e:
                     pass
 
+            # Check if someone won the game
+            winner = self.checkers.check_for_winner()
+            if winner:
+                self.show_game_over_screen(winner)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
@@ -140,11 +196,14 @@ class Game:
                         x, y = event.pos
                         col, row = x // 100, y // 100
                         
+                        # Make copy of the board to see if it changed
+                        old_board = [r[:] for r in self.checkers.board]
                         old_player = self.checkers.current_player
                         
                         self.checkers.handle_click(row, col)
                         
-                        if self.checkers.current_player != old_player:
+                        # Send update if the player changed OR if a move/jump was made!
+                        if self.checkers.current_player != old_player or self.checkers.board != old_board:
                             self.network.send({
                                 "type": "UPDATE",
                                 "board": self.checkers.board,

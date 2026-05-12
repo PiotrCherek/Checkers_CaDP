@@ -5,6 +5,7 @@ class Checkers:
         self.board = self.init_board()
         self.selected_piece = None
         self.current_player = "White"
+        self.must_jump_with = None
 
     def init_board(self) -> list:
         board = [[None for _ in range(8)] for _ in range(8)]
@@ -157,12 +158,17 @@ class Checkers:
         mandatory = self.get_all_mandatory_jumps()
 
         if self.own_piece_selected(row, col):
-            if mandatory and (row, col) not in mandatory: return
+            # NEW: If locked into a multiple jump, you can't click other pieces
+            if self.must_jump_with and (row, col) != self.must_jump_with:
+                print("You must continue jumping with the active piece!")
+                return
+            
+            if mandatory and (row, col) not in mandatory: 
+                return
             self.selected_piece = (row, col)
             return
 
         if self.selected_piece and self.move_legal(row, col):
-            # NEW KING-AWARE CAPTURE CHECK
             is_cap = self.is_capture_path_logic(self.selected_piece[0], self.selected_piece[1], row, col)
             
             if mandatory and not is_cap:
@@ -171,8 +177,37 @@ class Checkers:
 
             had_capture = self.move_piece(row, col)
 
+            # NEW: If we captured and can capture more, lock the turn to this piece!
             if had_capture and self.can_capture_more(row, col):
                 self.selected_piece = (row, col)
+                self.must_jump_with = (row, col) 
             else:
+                # Turn ends
                 self.selected_piece = None
+                self.must_jump_with = None
                 self.current_player = "Black" if self.current_player == "White" else "White"
+    
+    def check_for_winner(self) -> str:
+        white_count = 0
+        black_count = 0
+        
+        # Check the board, but only if it's currently initialized
+        if not self.board:
+            return None
+
+        for row in range(8):
+            for col in range(8):
+                piece = self.board[row][col]
+                if piece is not None:
+                    if "White" in piece:
+                        white_count += 1
+                    elif "Black" in piece:
+                        black_count += 1
+
+        # If a player has no pieces left, the other player wins
+        if white_count == 0:
+            return "Black"
+        elif black_count == 0:
+            return "White"
+            
+        return None

@@ -1,11 +1,15 @@
+import os
 import socket
 import pickle
+
+SERVER_IP = os.getenv("CHECKERS_SERVER_IP", "127.0.0.1")
+PORT = 5555
 
 class Network:
     def __init__(self) -> None:
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server = "127.0.0.1"
-        self.port = 5555
+        self.server = SERVER_IP
+        self.port = PORT
         self.addr = (self.server, self.port)
         self.color = self.connect()
 

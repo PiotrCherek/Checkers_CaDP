@@ -1,21 +1,28 @@
 import socket
 import threading
 import pickle
+import checkers as ck
 
-SERVER_IP = "127.0.0.1"
+SERVER_IP = "0.0.0.0"  # Accept connections on all network interfaces
 PORT = 5555
+MAX_PLAYERS = 2
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
     s.bind((SERVER_IP, PORT))
 except socket.error as e:
     print(str(e))
+    raise
 
-s.listen(2)
-print("Server Started. Waiting for connections...")
+s.listen(MAX_PLAYERS)
+local_ip = socket.gethostbyname(socket.gethostname())
+print(f"Server Started. Waiting for connections on 0.0.0.0:{PORT} (LAN IP: {local_ip})")
+
+# Initialize the shared board once both players are connected
+initial_board = ck.Checkers().board
 
 game_state = {
-    "board": None, 
+    "board": None,
     "current_player": "White",
     "ready": False
 }
@@ -63,13 +70,22 @@ def threaded_client(conn: socket.socket, player_color: str):
 
 while True:
     conn, addr = s.accept()
-    connections.append(conn)
     print(f"Connected to: {addr}")
     
+    if player_count >= MAX_PLAYERS:
+        conn.send(pickle.dumps({"error": "Server full"}))
+        conn.close()
+        print(f"Rejected connection from {addr}: server full")
+        continue
+
+    connections.append(conn)
     color = player_colors[player_count % 2]
-    
-    if len(connections) == 2:
+
+    if len(connections) == MAX_PLAYERS:
         game_state["ready"] = True
-        
-    threading.Thread(target=threaded_client, args=(conn, color)).start()
+        if game_state["board"] is None:
+            game_state["board"] = initial_board
+        print("Both players connected. Game is ready.")
+
+    threading.Thread(target=threaded_client, args=(conn, color), daemon=True).start()
     player_count += 1
